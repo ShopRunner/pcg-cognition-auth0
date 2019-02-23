@@ -6,35 +6,47 @@
  * @property {string} PRECOGNITIVE_PASSWORD
  */
 
-function cognitionDecision(user, context, callback) {
-    // START-INJECT
-    // END-INJECT
+/**
+ * @typedef {Context} context
+ * @typedef {User} user
+ * @typedef {Callback} callback
+ * @typedef {PrecognitiveError} PrecognitiveError
+ * @typedef {Cognition} Cognition
+ * @typedef {Versions} Versions
+ */
 
-    // DO NOT edit above this line.
-    // ---------------------------------------
+function (user, context, callback) {
 
+    // DO NOT EDIT BELOW THIS LINE
+    // --------------------------------
+
+<%= contents %>
+
+    // DO NOT EDIT ABOVE THIS LINE
+    // --------------------------------
+
+    /** @type {Cognition} */
     const pc = new Cognition({
         apiKey: configuration.PRECOGNITIVE_API_KEY,
-        version: Cognition.Versions.v1,
+        version: Versions.v1,
         auth: {
             userName: configuration.PRECOGNITIVE_USERNAME,
             password: configuration.PRECOGNITIVE_PASSWORD
         }
     });
 
-    // Filter user & context object as desired here
     pc.decision(user, context)
         .then((res) => {
             const isGoodLogin = Cognition.isGoodLogin(res);
+            let err = null;
 
             if (!isGoodLogin) {
-                // do mutation
+                err = new PrecognitiveError(true);
             }
 
-            callback(null, user, context);
+            callback(err, user, context);
         })
         .catch((err) => {
-            // Comment out if you want to suppress errors and continue auth w/o Precognitive
             callback(err, user, context);
         });
 }

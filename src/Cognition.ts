@@ -1,13 +1,96 @@
-import _ from 'lodash';
-import request from 'request';
+// This is to support the Auth0 Playground
+declare var request: typeof import('request');
+declare var _: typeof import('lodash');
 
-import {Callback, Context, ContextProtocol, User} from './Auth0';
+// Auth0 Types, Interfaces and other structures
+// ---------------------------------------------------
 
-interface DecisionOptions {
-    overrides?: object
+/**
+ * @description Auth0 authentication protocol potential values
+ * @link https://auth0.com/docs/rules/references/context-object
+ */
+enum ContextProtocol {
+    OidcBasicProfile = 'oidc-basic-profile',
+    OidcImplicitProfile = 'oidc-implicit-profile',
+    OAuth2ResourceOwner = 'oauth2-resource-owner',
+    OAuth2ResourceOwnerJwtBearer = 'oauth2-resource-owner-jwt-bearer',
+    OAuth2Password = 'oauth2-password',
+    OAuth2RefreshToken = 'oauth2-refresh-token',
+    SAMLP = 'samlp',
+    WSFed = 'wsfed',
+    WSTrustUsernameMixed = 'wstrust-usernamemixed',
+    Delegation = 'delegation',
+    RedirectCallback = 'redirect-callback',
 }
 
-export enum Versions {
+/**
+ * @description Auth0 Context Object, passed into rules
+ * @link https://auth0.com/docs/rules/references/context-object
+ */
+interface Context {
+    sessionID: string,
+    protocol: ContextProtocol,
+    request: {
+        userAgent: string,
+        ip: string,
+        hostname: string,
+        query: string,
+        geoip: {
+            country_code: string,
+            country_code3: string,
+            country_name: string,
+            city_name: string,
+            latitude: string,
+            longitude: string,
+            time_zone: string,
+            continent_code: string,
+        }
+    }
+}
+
+/**
+ * @description Auth0 User Object, passed into rules
+ * @link https://auth0.com/docs/rules/references/user-object
+ */
+interface User {
+    app_metadata: object,
+    created_at: Date,
+    email: string,
+    last_ip: string,
+    last_login: Date,
+    logins_count: number,
+    last_password_reset: Date,
+    password_set_date: Date,
+    updated_at: Date,
+    username: string,
+    user_id: string,
+    user_metadata: object
+}
+
+/**
+ * @description Auth0 Callback passed into rules
+ * @link: https://auth0.com/docs/rules#syntax
+ */
+interface Callback {
+    (err: null | Error, user: User, context: Context): void
+}
+
+/**
+ * @description Auth0 Rule Interface
+ * @link https://auth0.com/docs/rules
+ */
+interface Rule {
+    (user: User, context: Context, callback: Callback): void
+}
+
+// Cognition SDK
+// ---------------------------------------------------
+
+interface DecisionOptions {
+    overrides?: CognitionRequest
+}
+
+enum Versions {
     v1 = 'v1'
 }
 
@@ -40,13 +123,13 @@ const enum AuthenticationType {
 
 type AuthType = AuthenticationType | null;
 
-interface Response {
+interface CognitionResponse {
     score: number,
     decision: DecisionStatus,
     signals: Array<string>
 }
 
-interface Request {
+interface CognitionRequest {
     apiKey: string,
     eventId: string,
     dateTime: Date,
@@ -73,20 +156,34 @@ interface ConstructorOptions {
     }
 }
 
-export class Cognition {
+class PrecognitiveError extends Error {
+    public readonly isFraudulent: boolean;
+
+    constructor(isFraudulent = true) {
+        super('Precognitive: Reject Authentication');
+        this.isFraudulent = isFraudulent;
+    }
+}
+
+class Cognition {
     private readonly options: ConstructorOptions;
 
     constructor(options: ConstructorOptions) {
         this.options = options;
     }
 
-    public async decision(user: User, context: Context, options: DecisionOptions): Promise<Response> {
+    public async decision(user: User, context: Context, options: DecisionOptions): Promise<CognitionResponse> {
         const body = this.buildBody(user, context, options);
         return new Promise((resolve, reject) => {
             request.post({
                 baseUrl: _.get(this.options, 'apiUrl', 'https://api.precognitive.io'),
                 uri: `/${this.options.version}/decision/login`,
-                body
+                body,
+                json: true,
+                auth: {
+                    username: this.options.auth.userName,
+                    password: this.options.auth.password
+                }
             }, (err, response, body) => {
                 if (response.statusCode === 200) {
                     resolve(body);
@@ -102,21 +199,20 @@ export class Cognition {
 
     public async autoDecision(user: User, context: Context, callback: Callback, options: DecisionOptions): Promise<void> {
         try {
-            const response: Response = await this.decision(user, context, options);
+            const response: CognitionResponse = await this.decision(user, context, options);
+            let err: PrecognitiveError | null = null;
 
-            const isGoodLogin = Cognition.isGoodLogin(response);
-
-            if (!isGoodLogin) {
-                // mutate to force reauth
+            if (!Cognition.isGoodLogin(response)) {
+                err = new PrecognitiveError(true);
             }
-            callback(null, user, context);
+            callback(err, user, context);
         } catch (err) {
             callback(err, user, context);
         }
     }
 
-    public static isGoodLogin(decisionResponse: Response): boolean {
-        return decisionResponse.decision === DecisionStatus.allow;
+    public static isGoodLogin(decisionResponse: CognitionResponse): boolean {
+        return _.includes([DecisionStatus.allow, DecisionStatus.review], decisionResponse.decision);
     }
 
     private static getAuthenticationType(protocol: ContextProtocol): AuthenticationType | null {
@@ -140,7 +236,7 @@ export class Cognition {
         }
     }
 
-    private buildBody(user: User, context: Context, options: DecisionOptions): Request {
+    private buildBody(user: User, context: Context, options: DecisionOptions): CognitionRequest {
         return _.merge({
             apiKey: this.options.apiKey,
             eventId: context.sessionID,
