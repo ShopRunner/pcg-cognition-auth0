@@ -121,8 +121,6 @@ const enum AuthenticationType {
     other = 'other' // @todo add to API
 }
 
-type AuthType = AuthenticationType | null;
-
 interface CognitionResponse {
     score: number,
     decision: DecisionStatus,
@@ -140,7 +138,7 @@ interface CognitionRequest {
         userId: string,
         channel: Channel,
         usedCaptcha: boolean,
-        authenticationType?: AuthType,
+        authenticationType?: AuthenticationType | null,
         status: LoginStatus,
         passwordUpdateTime: Date,
         userNameUpdateTime?: Date
