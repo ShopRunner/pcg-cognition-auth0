@@ -24,7 +24,6 @@ function buildRule(rule) {
 function buildAutoDecision() {
     return buildRule({
         name: 'AutoDecision',
-        task: 'build:autoDecision',
         templateFile: 'autoDecision.js',
         outputFile: 'autoDecision.js'
     });
@@ -35,7 +34,6 @@ buildAutoDecision.description = 'Rule for allowing auto decision by Cognition SD
 function buildDecision() {
     return buildRule({
         name: 'Decision',
-        task: 'build:decision',
         templateFile: 'decision.js',
         outputFile: 'decision.js'
     });
