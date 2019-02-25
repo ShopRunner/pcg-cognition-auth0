@@ -12,7 +12,7 @@ const templateFilePath = path.join(__dirname, 'templates');
 function buildRule(rule) {
     return gulp.src('src/Cognition.ts')
         .pipe(ts({
-            // noImplicitAny: true,
+            noImplicitAny: true,
             target: "es5",
             module: "none"
         }))
@@ -31,7 +31,6 @@ function buildAutoDecision() {
 }
 
 buildAutoDecision.description = 'Rule for allowing auto decision by Cognition SDK';
-exports.buildAutoDecision = buildAutoDecision;
 
 function buildDecision() {
     return buildRule({
@@ -44,9 +43,12 @@ function buildDecision() {
 }
 
 buildDecision.description = 'Rule allowing the override of the auth decision Cognition SDK';
-exports.buildDecision = buildDecision;
 
-exports.default = gulp.parallel([
+module.exports = {
     buildAutoDecision,
-    buildDecision
-]);
+    buildDecision,
+    default: gulp.parallel([
+        buildAutoDecision,
+        buildDecision
+    ])
+};

@@ -90,7 +90,7 @@ interface DecisionOptions {
     overrides?: CognitionRequest
 }
 
-enum Versions {
+enum ApiVersion {
     v1 = 'v1'
 }
 
@@ -149,7 +149,7 @@ interface CognitionRequest {
 
 interface ConstructorOptions {
     apiKey: string,
-    version: Versions,
+    version: ApiVersion,
     auth: {
         userName: string,
         password: string
@@ -162,6 +162,20 @@ class PrecognitiveError extends Error {
     constructor(isFraudulent = true) {
         super('Precognitive: Reject Authentication');
         this.isFraudulent = isFraudulent;
+    }
+}
+
+class HttpError extends Error {
+    public readonly statusCode: number;
+    public readonly response: object | null;
+    public readonly body: any | null;
+
+    constructor(statusCode: number, response: object | null = null, body: any = null) {
+        super(`Precognitive: HTTP Error - ${statusCode}`);
+
+        this.statusCode = statusCode;
+        this.response = response;
+        this.body = body;
     }
 }
 
@@ -188,10 +202,8 @@ class Cognition {
                 if (response.statusCode === 200) {
                     resolve(body);
                 } else {
-                    reject({
-                        response,
-                        body
-                    });
+                    const httpErr = new HttpError(response.statusCode, response, body);
+                    reject(httpErr);
                 }
             });
         });
@@ -199,7 +211,7 @@ class Cognition {
 
     public async autoDecision(user: User, context: Context, callback: Callback, options: DecisionOptions): Promise<void> {
         try {
-            const response: CognitionResponse = await this.decision(user, context, options);
+            const response = await this.decision(user, context, options);
             let err: PrecognitiveError | null = null;
 
             if (!Cognition.isGoodLogin(response)) {

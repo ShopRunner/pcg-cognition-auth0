@@ -12,7 +12,7 @@
  * @typedef {Callback} callback
  * @typedef {PrecognitiveError} PrecognitiveError
  * @typedef {Cognition} Cognition
- * @typedef {Versions} Versions
+ * @typedef {ApiVersion} ApiVersion
  */
 
 function (user, context, callback) {
@@ -28,7 +28,7 @@ function (user, context, callback) {
     /** @type {Cognition} */
     const pc = new Cognition({
         apiKey: configuration.PRECOGNITIVE_API_KEY,
-        version: Versions.v1,
+        version: ApiVersion.v1,
         auth: {
             userName: configuration.PRECOGNITIVE_USERNAME,
             password: configuration.PRECOGNITIVE_PASSWORD

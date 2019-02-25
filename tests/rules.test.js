@@ -109,7 +109,7 @@ const decisionAssertDefaultRecord = {
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err.isPrecognitiveReject).toBe(true);
+                expect(err.isFraudulent).toBe(true);
                 done();
             });
         });
