@@ -165,6 +165,8 @@ enum LogLevel {
     NONE = 0
 }
 
+const SDK_NAME = 'Cognition';
+
 class Logger {
     private readonly logLevel: LogLevel;
 
@@ -173,26 +175,26 @@ class Logger {
     }
 
     public debug(...args: any) {
-        if (this.logLevel === LogLevel.DEBUG) {
-            console.debug(...args);
+        if (this.logLevel >= LogLevel.DEBUG) {
+            console.debug(`${SDK_NAME} DEBUG:`, ...args);
         }
     }
 
     public info(...args: any) {
-        if (this.logLevel <= LogLevel.INFO) {
-            console.info(...args);
+        if (this.logLevel >= LogLevel.INFO) {
+            console.info(`${SDK_NAME} INFO:`, ...args);
         }
     }
 
     public warn(...args: any) {
-        if (this.logLevel <= LogLevel.WARN) {
-            console.warn(...args);
+        if (this.logLevel >= LogLevel.WARN) {
+            console.warn(`${SDK_NAME} WARN:`, ...args);
         }
     }
 
     public error(...args: any) {
-        if (this.logLevel === LogLevel.ERROR) {
-            console.error(...args);
+        if (this.logLevel >= LogLevel.ERROR) {
+            console.error(`${SDK_NAME} ERROR:`, ...args);
         }
     }
 }
@@ -212,7 +214,7 @@ class HttpError extends Error {
     public readonly body: any | null;
 
     constructor(statusCode: number, response: object | null = null, body: any = null) {
-        super(`Precognitive: HTTP Error - ${statusCode}`);
+        super(`${SDK_NAME} - HTTP Error [${statusCode}]`);
 
         this.statusCode = statusCode;
         this.response = response;
@@ -235,12 +237,13 @@ class Cognition {
     }
 
     public async decision(user: User, context: Context, options: DecisionOptions): Promise<CognitionResponse> {
-        const body = this.buildBody(user, context, options);
+        const reqBody = this.buildBody(user, context, options);
+        this.logger.debug(`REQUEST BODY - ${JSON.stringify(reqBody)}`);
         return new Promise((resolve, reject) => {
             request.post({
                 baseUrl: _.get(this.options, 'apiUrl', 'https://api.precognitive.io'),
                 uri: `/${this.options.version}/decision/login`,
-                body,
+                body: reqBody,
                 json: true,
                 timeout: 2000,
                 auth: {
@@ -249,10 +252,11 @@ class Cognition {
                 }
             }, (err, response, body) => {
                 if (response.statusCode === 200) {
+                    this.logger.debug(`RESPONSE BODY - ${JSON.stringify(body)}`);
                     resolve(body);
                 } else {
-                    let ex = err ? err : new HttpError(response.statusCode, response, body);
-                    this.logger.error('Precognitive ERROR:', ex);
+                    const ex = err ? err : new HttpError(response.statusCode, response, body);
+                    this.logger.error(ex);
                     resolve({
                         score: 0,
                         confidence: 0,
@@ -271,10 +275,11 @@ class Cognition {
 
             if (!Cognition.isGoodLogin(response)) {
                 err = new PrecognitiveError(true);
+                this.logger.info('Auto-Decision - reject');
             }
             callback(err, user, context);
         } catch (err) {
-            this.logger.error('Precognitive ERROR:', err);
+            this.logger.error(err);
 
             // Default to auto-allow
             callback(null, user, context);
@@ -300,7 +305,7 @@ class Cognition {
             case ContextProtocol.OAuth2ResourceOwnerJwtBearer:
                 return AuthenticationType.key;
             default:
-                this.logger.warn('Precognitive WARN: Unable to determine AuthenticationType');
+                this.logger.warn('Unable to determine AuthenticationType');
                 return null;
             // @todo support `other`
             // return AuthenticationType.other;
@@ -323,7 +328,4 @@ class Cognition {
             }
         }, _.get(options, 'overrides', {}));
     }
-
 }
-
-

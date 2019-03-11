@@ -110,9 +110,9 @@ const decisionAssertDefaultRecord = {
             request.__UPDATE_RESPONSE(200);
             request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err.isFraudulent).toBe(true);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err.isFraudulent).toBe(true);
                 done();
             });
         });
@@ -122,9 +122,9 @@ const decisionAssertDefaultRecord = {
             request.__UPDATE_RESPONSE(200);
             request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err).toBe(null);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err).toBe(null);
                 done();
             });
         });
@@ -134,9 +134,9 @@ const decisionAssertDefaultRecord = {
             request.__UPDATE_RESPONSE(200);
             request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err).toBe(null);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err).toBe(null);
                 done();
             });
         });
@@ -145,9 +145,9 @@ const decisionAssertDefaultRecord = {
             request.__UPDATE_RESPONSE(403);
             request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err).toBe(null);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err).toBe(null);
                 done();
             });
         });
