@@ -24,7 +24,12 @@ request.__UPDATE_RESPONSE = (code) => {
 request.__UPDATE_BODY = (decision) => {
     body.decision = decision;
 };
+request.__TIMEOUT = 0;
 
-request.post = jest.fn((options, cb) => cb(null, res, body));
+request.post = jest.fn((options, cb) => {
+    setTimeout(() => {
+        cb(null, res, body);
+    }, request.__TIMEOUT);
+});
 
 module.exports = request;

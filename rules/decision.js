@@ -92,6 +92,57 @@ var ApiVersion;
 (function (ApiVersion) {
     ApiVersion["v1"] = "v1";
 })(ApiVersion || (ApiVersion = {}));
+var LogLevel;
+(function (LogLevel) {
+    LogLevel[LogLevel["DEBUG"] = 4] = "DEBUG";
+    LogLevel[LogLevel["INFO"] = 3] = "INFO";
+    LogLevel[LogLevel["WARN"] = 2] = "WARN";
+    LogLevel[LogLevel["ERROR"] = 1] = "ERROR";
+    LogLevel[LogLevel["NONE"] = 0] = "NONE";
+})(LogLevel || (LogLevel = {}));
+var SDK_NAME = 'Cognition';
+var Logger = /** @class */ (function () {
+    function Logger(logLevel) {
+        this.logLevel = logLevel;
+    }
+    Logger.prototype.debug = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        if (this.logLevel >= LogLevel.DEBUG) {
+            console.debug.apply(console, [SDK_NAME + " DEBUG:"].concat(args));
+        }
+    };
+    Logger.prototype.info = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        if (this.logLevel >= LogLevel.INFO) {
+            console.info.apply(console, [SDK_NAME + " INFO:"].concat(args));
+        }
+    };
+    Logger.prototype.warn = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        if (this.logLevel >= LogLevel.WARN) {
+            console.warn.apply(console, [SDK_NAME + " WARN:"].concat(args));
+        }
+    };
+    Logger.prototype.error = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        if (this.logLevel >= LogLevel.ERROR) {
+            console.error.apply(console, [SDK_NAME + " ERROR:"].concat(args));
+        }
+    };
+    return Logger;
+}());
 var PrecognitiveError = /** @class */ (function (_super) {
     __extends(PrecognitiveError, _super);
     function PrecognitiveError(isFraudulent) {
@@ -107,7 +158,7 @@ var HttpError = /** @class */ (function (_super) {
     function HttpError(statusCode, response, body) {
         if (response === void 0) { response = null; }
         if (body === void 0) { body = null; }
-        var _this = _super.call(this, "Precognitive: HTTP Error - " + statusCode) || this;
+        var _this = _super.call(this, SDK_NAME + " - HTTP Error [" + statusCode + "]") || this;
         _this.statusCode = statusCode;
         _this.response = response;
         _this.body = body;
@@ -118,30 +169,45 @@ var HttpError = /** @class */ (function (_super) {
 var Cognition = /** @class */ (function () {
     function Cognition(options) {
         this.options = options;
+        if (this.options.logger) {
+            this.logger = this.options.logger;
+        }
+        else {
+            this.logger = new Logger(this.options.logLevel || LogLevel.NONE);
+        }
     }
     Cognition.prototype.decision = function (user, context, options) {
         return __awaiter(this, void 0, void 0, function () {
-            var body;
+            var reqBody;
             var _this = this;
             return __generator(this, function (_a) {
-                body = this.buildBody(user, context, options);
+                reqBody = this.buildBody(user, context, options);
+                this.logger.debug("REQUEST BODY - " + JSON.stringify(reqBody));
                 return [2 /*return*/, new Promise(function (resolve, reject) {
                         request.post({
                             baseUrl: _.get(_this.options, 'apiUrl', 'https://api.precognitive.io'),
                             uri: "/" + _this.options.version + "/decision/login",
-                            body: body,
+                            body: reqBody,
                             json: true,
+                            timeout: 2000,
                             auth: {
                                 username: _this.options.auth.userName,
                                 password: _this.options.auth.password
                             }
                         }, function (err, response, body) {
                             if (response.statusCode === 200) {
+                                _this.logger.debug("RESPONSE BODY - " + JSON.stringify(body));
                                 resolve(body);
                             }
                             else {
-                                var httpErr = new HttpError(response.statusCode, response, body);
-                                reject(httpErr);
+                                var ex = err ? err : new HttpError(response.statusCode, response, body);
+                                _this.logger.error(ex);
+                                resolve({
+                                    score: 0,
+                                    confidence: 0,
+                                    decision: "allow" /* allow */,
+                                    signals: ['unable-to-decision']
+                                });
                             }
                         });
                     })];
@@ -161,12 +227,15 @@ var Cognition = /** @class */ (function () {
                         err = null;
                         if (!Cognition.isGoodLogin(response)) {
                             err = new PrecognitiveError(true);
+                            this.logger.info('Auto-Decision - reject');
                         }
                         callback(err, user, context);
                         return [3 /*break*/, 3];
                     case 2:
                         err_1 = _a.sent();
-                        callback(err_1, user, context);
+                        this.logger.error(err_1);
+                        // Default to auto-allow
+                        callback(null, user, context);
                         return [3 /*break*/, 3];
                     case 3: return [2 /*return*/];
                 }
@@ -176,7 +245,7 @@ var Cognition = /** @class */ (function () {
     Cognition.isGoodLogin = function (decisionResponse) {
         return _.includes(["allow" /* allow */, "review" /* review */], decisionResponse.decision);
     };
-    Cognition.getAuthenticationType = function (protocol) {
+    Cognition.prototype.getAuthenticationType = function (protocol) {
         switch (protocol) {
             case ContextProtocol.OidcBasicProfile:
             case ContextProtocol.OidcImplicitProfile:
@@ -191,6 +260,7 @@ var Cognition = /** @class */ (function () {
             case ContextProtocol.OAuth2ResourceOwnerJwtBearer:
                 return "key" /* key */;
             default:
+                this.logger.warn('Unable to determine AuthenticationType');
                 return null;
             // @todo support `other`
             // return AuthenticationType.other;
@@ -206,7 +276,7 @@ var Cognition = /** @class */ (function () {
                 userId: user.user_id,
                 channel: "web" /* web */,
                 usedCaptcha: false,
-                authenticationType: Cognition.getAuthenticationType(context.protocol),
+                authenticationType: this.getAuthenticationType(context.protocol),
                 status: "success" /* success */,
                 passwordUpdateTime: user.last_password_reset
             }

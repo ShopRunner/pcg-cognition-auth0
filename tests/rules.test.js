@@ -73,6 +73,7 @@ const defaultOptions = {
 const decisionAssertDefaultRecord = {
     baseUrl: "https://api.precognitive.io",
     json: true,
+    timeout: 2000,
     uri: "/v1/decision/login",
     auth: {
         username: 'test',
@@ -106,30 +107,47 @@ const decisionAssertDefaultRecord = {
 
         it('disallows the login if the response is `reject`', (done) => {
             request.__UPDATE_BODY('reject');
+            request.__UPDATE_RESPONSE(200);
+            request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err.isFraudulent).toBe(true);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err.isFraudulent).toBe(true);
                 done();
             });
         });
 
         it('allows the login if the response is `review`', (done) => {
             request.__UPDATE_BODY('review');
+            request.__UPDATE_RESPONSE(200);
+            request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err).toBe(null);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
-                expect(err).toBe(null);
                 done();
             });
         });
 
         it('allows the login if the response is `allow`', (done) => {
             request.__UPDATE_BODY('allow');
+            request.__UPDATE_RESPONSE(200);
+            request.__TIMEOUT = 0;
             auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
+                expect(err).toBe(null);
                 expect(request.post).toHaveBeenCalledTimes(1);
                 expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
+                done();
+            });
+        });
+
+        it('auto decisions to allow if HTTP status code != 200', (done) => {
+            request.__UPDATE_RESPONSE(403);
+            request.__TIMEOUT = 0;
+            auth0runner(`../rules/${rule}`, defaultOptions, function (err, user, context) {
                 expect(err).toBe(null);
+                expect(request.post).toHaveBeenCalledTimes(1);
+                expect(request.post).toHaveBeenCalledWith(decisionAssertDefaultRecord, expect.any(Function));
                 done();
             });
         });
