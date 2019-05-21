@@ -3,12 +3,14 @@ declare var request: typeof import('request');
 declare var _: typeof import('lodash');
 
 // Auth0 Types, Interfaces and other structures
+// Context Object - https://auth0.com/docs/rules/references/context-object
+// User Object - https://auth0.com/docs/rules/references/user-object
 // ---------------------------------------------------
 
-/**
- * @description Auth0 authentication protocol potential values
- * @link https://auth0.com/docs/rules/references/context-object
- */
+type MetaData = {
+    [s: string]: string
+}
+
 enum ContextProtocol {
     OidcBasicProfile = 'oidc-basic-profile',
     OidcImplicitProfile = 'oidc-implicit-profile',
@@ -23,18 +25,63 @@ enum ContextProtocol {
     RedirectCallback = 'redirect-callback',
 }
 
+enum ContextAuthenticationMethodName {
+    federated = 'federated',
+    pwd = 'pwd',
+    sms = 'sms',
+    email = 'email',
+    mfa = 'mfa'
+}
+
+type ContextAuthenticationMethod = {
+    name: ContextAuthenticationMethodName,
+    timestamp: number
+}
+
 /**
  * @description Auth0 Context Object, passed into rules
  * @link https://auth0.com/docs/rules/references/context-object
  */
 interface Context {
-    sessionID: string,
+    tenant: string,
+    clientID: string,
+    clientName: string,
+    clientMetadata: MetaData,
+    connectionID: string,
+    connection: string,
+    connectionStrategy: string,
+    connectionOptions: {
+        tenant_domain: string,
+        domain_aliases: Array<string>
+    },
+    connectionMetadata: MetaData,
+    samlConfiguration: object,
     protocol: ContextProtocol,
+    stats: object,
+    sso: {
+        with_auth0: boolean,
+        with_dbconn: boolean,
+        current_clients?: Array<string>
+    },
+    accessToken: {
+        scope?: Array<string>
+    },
+    idToken: object,
+    original_protocol: string,
+    multifactor: object,
+    sessionID: string,
+    authentication: {
+        methods: Array<ContextAuthenticationMethod>
+    },
+    primaryUser: string,
     request: {
         userAgent: string,
         ip: string,
         hostname: string,
-        query: string,
+        query: {
+            cognition_event_id: string
+        },
+        body: object,
         geoip: {
             country_code: string,
             country_code3: string,
@@ -45,7 +92,15 @@ interface Context {
             time_zone: string,
             continent_code: string,
         }
-    }
+    },
+    authorization: { roles: Array<string> }
+}
+
+type UserIdentity = {
+    connection: string,
+    isSocial: boolean,
+    provider: string,
+    user_id: string
 }
 
 /**
@@ -53,18 +108,23 @@ interface Context {
  * @link https://auth0.com/docs/rules/references/user-object
  */
 interface User {
-    app_metadata: object,
+    app_metadata: MetaData,
+    blocked: boolean,
     created_at: Date,
     email: string,
-    last_ip: string,
-    last_login: Date,
-    logins_count: number,
+    email_verified: boolean,
+    identities: Array<UserIdentity>
+    multifactor: Array<string>,
+    name: string,
+    nickname: string,
     last_password_reset: Date,
-    password_set_date: Date,
+    phone_number: string,
+    phone_verified: boolean,
+    picture: string,
     updated_at: Date,
-    username: string,
     user_id: string,
-    user_metadata: object
+    user_metadata: MetaData
+    username: string,
 }
 
 /**
@@ -82,6 +142,7 @@ interface Callback {
 interface Rule {
     (user: User, context: Context, callback: Callback): void
 }
+
 
 // Cognition SDK
 // ---------------------------------------------------
@@ -116,15 +177,15 @@ const enum AuthenticationType {
     password = 'password',
     two_factor = 'two_factor',
     single_sign_on = 'single_sign_on',
-    key = 'key',
-
-    other = 'other' // @todo add to API
+    social_sign_on = 'social_sign_on',
+    key = 'key'
 }
 
 interface CognitionResponse {
     score: number,
     confidence: number,
     decision: DecisionStatus,
+    tokenId: string,
     signals: Array<string>
 }
 
@@ -153,6 +214,7 @@ interface ConstructorOptions {
         userName: string,
         password: string
     },
+    timeout?: number,
     logger?: Logger,
     logLevel?: LogLevel
 }
@@ -200,11 +262,11 @@ class Logger {
 }
 
 class PrecognitiveError extends Error {
-    public readonly isFraudulent: boolean;
+    public readonly isFraud: boolean;
 
-    constructor(isFraudulent = true) {
+    constructor(isFraud = true) {
         super('Precognitive: Reject Authentication');
-        this.isFraudulent = isFraudulent;
+        this.isFraud = isFraud;
     }
 }
 
@@ -236,6 +298,10 @@ class Cognition {
         }
     }
 
+    public static isGoodLogin(decisionResponse: CognitionResponse): boolean {
+        return _.includes([DecisionStatus.allow, DecisionStatus.review], decisionResponse.decision);
+    }
+
     public async decision(user: User, context: Context, options: DecisionOptions): Promise<CognitionResponse> {
         const reqBody = this.buildBody(user, context, options);
         this.logger.debug(`REQUEST BODY - ${JSON.stringify(reqBody)}`);
@@ -245,7 +311,7 @@ class Cognition {
                 uri: `/${this.options.version}/decision/login`,
                 body: reqBody,
                 json: true,
-                timeout: 2000,
+                timeout: this.options.timeout || 2000,
                 auth: {
                     username: this.options.auth.userName,
                     password: this.options.auth.password
@@ -260,8 +326,9 @@ class Cognition {
                     resolve({
                         score: 0,
                         confidence: 0,
+                        tokenId: "",
                         decision: DecisionStatus.allow,
-                        signals: ['unable-to-decision']
+                        signals: ['failure_to_decision']
                     });
                 }
             });
@@ -286,43 +353,69 @@ class Cognition {
         }
     }
 
-    public static isGoodLogin(decisionResponse: CognitionResponse): boolean {
-        return _.includes([DecisionStatus.allow, DecisionStatus.review], decisionResponse.decision);
+    /**
+     * @description Method to allow override by customers to allow a custom userId (usually via meta_data)
+     * @param user
+     * @param context
+     */
+    protected getUserId(user: User, context: Context): string {
+        return user.user_id;
     }
 
-    private getAuthenticationType(protocol: ContextProtocol): AuthenticationType | null {
-        switch (protocol) {
-            case ContextProtocol.OidcBasicProfile:
-            case ContextProtocol.OidcImplicitProfile:
-            case ContextProtocol.OAuth2ResourceOwner:
-            case ContextProtocol.OAuth2Password:
-                return AuthenticationType.password;
-            case ContextProtocol.SAMLP:
-            case ContextProtocol.WSFed:
-            case ContextProtocol.WSTrustUsernameMixed:
+    private getAuthenticationType(user: User, context: Context): AuthenticationType | null {
+        const latestAuthMethod: ContextAuthenticationMethod = _.last(_.sortBy(context.authentication.methods, 'timestamp'));
+
+        if (latestAuthMethod.name === ContextAuthenticationMethodName.mfa) {
+            return AuthenticationType.two_factor;
+        } else if (latestAuthMethod.name === ContextAuthenticationMethodName.federated) {
+            const identity = _.find(user.identities, {connection: context.connection});
+            // check social VS sso
+            if (identity.isSocial) {
+                return AuthenticationType.social_sign_on;
+            } else {
                 return AuthenticationType.single_sign_on;
-            case ContextProtocol.OAuth2RefreshToken:
-            case ContextProtocol.OAuth2ResourceOwnerJwtBearer:
-                return AuthenticationType.key;
-            default:
-                this.logger.warn('Unable to determine AuthenticationType');
-                return null;
-            // @todo support `other`
-            // return AuthenticationType.other;
+            }
+        } else {
+            // Currently password-less still falls to password
+            return AuthenticationType.password;
         }
+    }
+
+    private getChannel(user: User, context: Context): Channel {
+        return Channel.web;
     }
 
     private buildBody(user: User, context: Context, options: DecisionOptions): CognitionRequest {
         return _.merge({
+            _custom: {
+                // Include Auth0 Specific data points
+                auth0: {
+                    user: {
+                        updated: user.updated_at,
+                        fullName: user.name,
+                        username: user.username,
+                        email: user.email,
+                        phoneNumber: user.phone_number,
+                        blocked: user.blocked
+                    },
+                    context: {
+                        authenticationMethods: context.authentication.methods,
+                        stats: context.stats,
+                        geoIp: context.request.geoip,
+                        primaryUser: context.primaryUser
+                    }
+                }
+            },
             apiKey: this.options.apiKey,
-            eventId: context.sessionID,
+            eventId: _.get(context.request.query, 'cognition_event_id', null),
             dateTime: new Date(),
             ipAddress: context.request.ip,
             login: {
-                userId: user.user_id,
-                channel: Channel.web, // @todo in future allow for mapping
+                userId: this.getUserId(user, context),
+                channel: this.getChannel(user, context),
                 usedCaptcha: false,
-                authenticationType: this.getAuthenticationType(context.protocol),
+                usedRememberMe: false,
+                authenticationType: this.getAuthenticationType(user, context),
                 status: LoginStatus.success,
                 passwordUpdateTime: user.last_password_reset
             }

@@ -68,12 +68,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-// Auth0 Types, Interfaces and other structures
-// ---------------------------------------------------
-/**
- * @description Auth0 authentication protocol potential values
- * @link https://auth0.com/docs/rules/references/context-object
- */
 var ContextProtocol;
 (function (ContextProtocol) {
     ContextProtocol["OidcBasicProfile"] = "oidc-basic-profile";
@@ -88,6 +82,14 @@ var ContextProtocol;
     ContextProtocol["Delegation"] = "delegation";
     ContextProtocol["RedirectCallback"] = "redirect-callback";
 })(ContextProtocol || (ContextProtocol = {}));
+var ContextAuthenticationMethodName;
+(function (ContextAuthenticationMethodName) {
+    ContextAuthenticationMethodName["federated"] = "federated";
+    ContextAuthenticationMethodName["pwd"] = "pwd";
+    ContextAuthenticationMethodName["sms"] = "sms";
+    ContextAuthenticationMethodName["email"] = "email";
+    ContextAuthenticationMethodName["mfa"] = "mfa";
+})(ContextAuthenticationMethodName || (ContextAuthenticationMethodName = {}));
 var ApiVersion;
 (function (ApiVersion) {
     ApiVersion["v1"] = "v1";
@@ -145,10 +147,10 @@ var Logger = /** @class */ (function () {
 }());
 var PrecognitiveError = /** @class */ (function (_super) {
     __extends(PrecognitiveError, _super);
-    function PrecognitiveError(isFraudulent) {
-        if (isFraudulent === void 0) { isFraudulent = true; }
+    function PrecognitiveError(isFraud) {
+        if (isFraud === void 0) { isFraud = true; }
         var _this = _super.call(this, 'Precognitive: Reject Authentication') || this;
-        _this.isFraudulent = isFraudulent;
+        _this.isFraud = isFraud;
         return _this;
     }
     return PrecognitiveError;
@@ -176,6 +178,9 @@ var Cognition = /** @class */ (function () {
             this.logger = new Logger(this.options.logLevel || LogLevel.NONE);
         }
     }
+    Cognition.isGoodLogin = function (decisionResponse) {
+        return _.includes(["allow" /* allow */, "review" /* review */], decisionResponse.decision);
+    };
     Cognition.prototype.decision = function (user, context, options) {
         return __awaiter(this, void 0, void 0, function () {
             var reqBody;
@@ -189,7 +194,7 @@ var Cognition = /** @class */ (function () {
                             uri: "/" + _this.options.version + "/decision/login",
                             body: reqBody,
                             json: true,
-                            timeout: 2000,
+                            timeout: _this.options.timeout || 2000,
                             auth: {
                                 username: _this.options.auth.userName,
                                 password: _this.options.auth.password
@@ -205,8 +210,9 @@ var Cognition = /** @class */ (function () {
                                 resolve({
                                     score: 0,
                                     confidence: 0,
+                                    tokenId: "",
                                     decision: "allow" /* allow */,
-                                    signals: ['unable-to-decision']
+                                    signals: ['failure_to_decision']
                                 });
                             }
                         });
@@ -242,41 +248,68 @@ var Cognition = /** @class */ (function () {
             });
         });
     };
-    Cognition.isGoodLogin = function (decisionResponse) {
-        return _.includes(["allow" /* allow */, "review" /* review */], decisionResponse.decision);
+    /**
+     * @description Method to allow override by customers to allow a custom userId (usually via meta_data)
+     * @param user
+     * @param context
+     */
+    Cognition.prototype.getUserId = function (user, context) {
+        return user.user_id;
     };
-    Cognition.prototype.getAuthenticationType = function (protocol) {
-        switch (protocol) {
-            case ContextProtocol.OidcBasicProfile:
-            case ContextProtocol.OidcImplicitProfile:
-            case ContextProtocol.OAuth2ResourceOwner:
-            case ContextProtocol.OAuth2Password:
-                return "password" /* password */;
-            case ContextProtocol.SAMLP:
-            case ContextProtocol.WSFed:
-            case ContextProtocol.WSTrustUsernameMixed:
-                return "single_sign_on" /* single_sign_on */;
-            case ContextProtocol.OAuth2RefreshToken:
-            case ContextProtocol.OAuth2ResourceOwnerJwtBearer:
-                return "key" /* key */;
-            default:
-                this.logger.warn('Unable to determine AuthenticationType');
-                return null;
-            // @todo support `other`
-            // return AuthenticationType.other;
+    Cognition.prototype.getAuthenticationType = function (user, context) {
+        var latestAuthMethod = _.last(_.sortBy(context.authentication.methods, 'timestamp'));
+        if (latestAuthMethod.name === ContextAuthenticationMethodName.mfa) {
+            return "two_factor" /* two_factor */;
         }
+        else if (latestAuthMethod.name === ContextAuthenticationMethodName.federated) {
+            var identity = _.find(user.identities, { connection: context.connection });
+            // check social VS sso
+            if (identity.isSocial) {
+                return "social_sign_on" /* social_sign_on */;
+            }
+            else {
+                return "single_sign_on" /* single_sign_on */;
+            }
+        }
+        else {
+            // Currently password-less still falls to password
+            return "password" /* password */;
+        }
+    };
+    Cognition.prototype.getChannel = function (user, context) {
+        return "web" /* web */;
     };
     Cognition.prototype.buildBody = function (user, context, options) {
         return _.merge({
+            _custom: {
+                // Include Auth0 Specific data points
+                auth0: {
+                    user: {
+                        updated: user.updated_at,
+                        fullName: user.name,
+                        username: user.username,
+                        email: user.email,
+                        phoneNumber: user.phone_number,
+                        blocked: user.blocked
+                    },
+                    context: {
+                        authenticationMethods: context.authentication.methods,
+                        stats: context.stats,
+                        geoIp: context.request.geoip,
+                        primaryUser: context.primaryUser
+                    }
+                }
+            },
             apiKey: this.options.apiKey,
-            eventId: context.sessionID,
+            eventId: _.get(context.request.query, 'cognition_event_id', null),
             dateTime: new Date(),
             ipAddress: context.request.ip,
             login: {
-                userId: user.user_id,
-                channel: "web" /* web */,
+                userId: this.getUserId(user, context),
+                channel: this.getChannel(user, context),
                 usedCaptcha: false,
-                authenticationType: this.getAuthenticationType(context.protocol),
+                usedRememberMe: false,
+                authenticationType: this.getAuthenticationType(user, context),
                 status: "success" /* success */,
                 passwordUpdateTime: user.last_password_reset
             }

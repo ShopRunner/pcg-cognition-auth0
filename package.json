@@ -1,25 +1,25 @@
 {
   "name": "cognition-auth0",
-  "version": "1.0.0-rc",
+  "version": "1.0.0-rc1",
   "description": "Cognition SDK for Auth0 Integration",
   "directories": {
     "test": "tests"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.6",
-    "@types/lodash": "^4.14.121",
-    "@types/node": "^11.9.4",
+    "@types/jest": "^24.0.13",
+    "@types/lodash": "^4.14.130",
+    "@types/node": "^12.0.2",
     "@types/request": "^2.48.1",
     "auth0-rule-sandbox": "^2.0.1",
-    "gulp": "^4.0.0",
+    "gulp": "^4.0.2",
     "gulp-rename": "^1.4.0",
-    "gulp-typescript": "^5.0.0",
-    "gulp-wrap": "^0.14.0",
-    "jest": "^24.1.0",
+    "gulp-typescript": "^5.0.1",
+    "gulp-wrap": "^0.15.0",
+    "jest": "^24.8.0",
     "lodash": "^4.17.11",
     "nock": "^10.0.6",
     "request": "^2.88.0",
-    "typescript": "^3.3.3"
+    "typescript": "^3.4.5"
   },
   "scripts": {
     "test": "jest -c jestconfig.json",
