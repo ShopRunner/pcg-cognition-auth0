@@ -42,7 +42,7 @@ const passwordLogin = {
     sessionID: 'e8fIMl_DTF-skE6wo-iXnq-BUl2gh8En',
     request: {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36',
-      ip: '50.235.200.180',
+      ip: '127.0.0.1',
       hostname: 'login.precognitive.com',
       query: {
         protocol: 'oauth2',
@@ -97,7 +97,7 @@ const authorizeLogin = {
     sessionID: 'XpChJgmQL5a_sqR9f1cUDn4nfei8Oz7_',
     request: {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36',
-      ip: '50.235.200.180',
+      ip: '127.0.0.1',
       hostname: 'login.precognitive.com',
       query: {
         redirect_uri: 'https://members.precognitive.com/api/callback',
@@ -175,7 +175,7 @@ const googleLogin = {
     sessionID: 'jb8PdOGtTJqmaGc6H_H6Nb-FI50035l8',
     request: {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36',
-      ip: '50.235.200.180',
+      ip: '127.0.0.1',
       hostname: 'login.precognitive.com',
       query: {
         protocol: 'oauth2',
@@ -249,7 +249,7 @@ const facebookLogin = {
     sessionID: 'B07Vyp1Be55NNNezvYbsvgCz_vWENN9F',
     request: {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36',
-      ip: '50.235.200.180',
+      ip: '127.0.0.1',
       hostname: 'login.precognitive.com',
       query: {
         protocol: 'oauth2',
@@ -346,7 +346,7 @@ const yahooLogin = {
     sessionID: '8sIjwptQ06VYqE6RwZaXWHiNvjxUxhh9',
     request: {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36',
-      ip: '50.235.200.180',
+      ip: '127.0.0.1',
       hostname: 'login.precognitive.com',
       query: {
         protocol: 'oauth2',
@@ -378,6 +378,7 @@ const yahooLogin = {
 
 module.exports = {
   passwordLogin,
+  authorizeLogin,
   googleLogin,
   facebookLogin,
   yahooLogin
