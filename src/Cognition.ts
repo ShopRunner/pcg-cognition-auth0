@@ -399,6 +399,7 @@ class Cognition {
             _custom: {
                 // Include Auth0 Specific data points
                 auth0: {
+                    sdkVersion: '1.0',
                     user: {
                         updated: user.updated_at,
                         fullName: user.name,
