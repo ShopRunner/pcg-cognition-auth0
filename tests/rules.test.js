@@ -86,7 +86,7 @@ const decisionAssertDefaultRecord = () => ({
       status: 'success',
       usedCaptcha: false,
       usedRememberMe: false,
-      userId: '1932e62e664a454c35ac',
+      userId: '64a454c35ac1932e62e6',
     },
   }
 });
