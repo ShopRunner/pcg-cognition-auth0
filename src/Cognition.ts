@@ -214,6 +214,9 @@ interface ConstructorOptions {
         userName: string,
         password: string
     },
+    getUserId?: {
+        (user: User, context: Context): string
+    },
     timeout?: number,
     logger?: Logger,
     logLevel?: LogLevel
@@ -303,7 +306,7 @@ class Cognition {
     }
 
     public async decision(user: User, context: Context, options: DecisionOptions): Promise<CognitionResponse> {
-        const reqBody = this.buildBody(user, context, options);
+        const reqBody = this._buildBody(user, context, options);
         this.logger.debug(`REQUEST BODY - ${JSON.stringify(reqBody)}`);
         return new Promise((resolve, reject) => {
             request.post({
@@ -358,11 +361,15 @@ class Cognition {
      * @param user
      * @param context
      */
-    protected getUserId(user: User, context: Context): string {
-        return user.user_id;
+    private _getUserId(user: User, context: Context): string {
+        if (this.options.getUserId) {
+            return this.options.getUserId(user, context);
+        } else {
+            return user.user_id;
+        }
     }
 
-    private getAuthenticationType(user: User, context: Context): AuthenticationType | null {
+    private _getAuthenticationType(user: User, context: Context): AuthenticationType | null {
         const latestAuthMethod: ContextAuthenticationMethod = _.last(_.sortBy(context.authentication.methods, 'timestamp'));
 
         if (latestAuthMethod.name === ContextAuthenticationMethodName.mfa) {
@@ -375,17 +382,19 @@ class Cognition {
             } else {
                 return AuthenticationType.single_sign_on;
             }
+        } else if (_.get(context, 'sso.current_clients', []).length > 0) {
+            return AuthenticationType.client_storage;
         } else {
             // Currently password-less still falls to password
             return AuthenticationType.password;
         }
     }
 
-    private getChannel(user: User, context: Context): Channel {
+    private _getChannel(user: User, context: Context): Channel {
         return Channel.web;
     }
 
-    private buildBody(user: User, context: Context, options: DecisionOptions): CognitionRequest {
+    private _buildBody(user: User, context: Context, options: DecisionOptions): CognitionRequest {
         return _.merge({
             _custom: {
                 // Include Auth0 Specific data points
@@ -395,14 +404,17 @@ class Cognition {
                         fullName: user.name,
                         username: user.username,
                         email: user.email,
+                        emailVerified: user.email_verified || false,
                         phoneNumber: user.phone_number,
-                        blocked: user.blocked
+                        phoneNumberVerified: user.phone_verified || false,
+                        blocked: user.blocked || false
                     },
                     context: {
                         authenticationMethods: context.authentication.methods,
                         stats: context.stats,
                         geoIp: context.request.geoip,
-                        primaryUser: context.primaryUser
+                        primaryUser: context.primaryUser,
+                        ssoCurrentClients: context.sso.current_clients
                     }
                 }
             },
@@ -411,11 +423,11 @@ class Cognition {
             dateTime: new Date(),
             ipAddress: context.request.ip,
             login: {
-                userId: this.getUserId(user, context),
-                channel: this.getChannel(user, context),
+                userId: this._getUserId(user, context),
+                channel: this._getChannel(user, context),
                 usedCaptcha: false,
                 usedRememberMe: false,
-                authenticationType: this.getAuthenticationType(user, context),
+                authenticationType: this._getAuthenticationType(user, context),
                 status: LoginStatus.success,
                 passwordUpdateTime: user.last_password_reset
             }
