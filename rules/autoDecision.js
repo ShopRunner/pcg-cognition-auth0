@@ -185,7 +185,7 @@ var Cognition = /** @class */ (function () {
             var reqBody;
             var _this = this;
             return __generator(this, function (_a) {
-                reqBody = this.buildBody(user, context, options);
+                reqBody = this._buildBody(user, context, options);
                 this.logger.debug("REQUEST BODY - " + JSON.stringify(reqBody));
                 return [2 /*return*/, new Promise(function (resolve, reject) {
                         request.post({
@@ -252,10 +252,15 @@ var Cognition = /** @class */ (function () {
      * @param user
      * @param context
      */
-    Cognition.prototype.getUserId = function (user, context) {
-        return user.user_id;
+    Cognition.prototype._getUserId = function (user, context) {
+        if (this.options.getUserId) {
+            return this.options.getUserId(user, context);
+        }
+        else {
+            return user.user_id;
+        }
     };
-    Cognition.prototype.getAuthenticationType = function (user, context) {
+    Cognition.prototype._getAuthenticationType = function (user, context) {
         var latestAuthMethod = _.last(_.sortBy(context.authentication.methods, 'timestamp'));
         if (latestAuthMethod.name === ContextAuthenticationMethodName.mfa) {
             return "two_factor" /* two_factor */;
@@ -270,32 +275,41 @@ var Cognition = /** @class */ (function () {
                 return "single_sign_on" /* single_sign_on */;
             }
         }
+        else if (_.get(context, 'sso.current_clients', []).length > 0) {
+            return "client_storage" /* client_storage */;
+        }
         else {
             // Currently password-less still falls to password
             return "password" /* password */;
         }
     };
-    Cognition.prototype.getChannel = function (user, context) {
+    Cognition.prototype._getChannel = function (user, context) {
         return "web" /* web */;
     };
-    Cognition.prototype.buildBody = function (user, context, options) {
+    Cognition.prototype._buildBody = function (user, context, options) {
         return _.merge({
             _custom: {
                 // Include Auth0 Specific data points
                 auth0: {
+                    sdkVersion: '1.0',
                     user: {
                         updated: user.updated_at,
                         fullName: user.name,
+                        lastName: user.family_name,
+                        firstName: user.given_name,
                         username: user.username,
                         email: user.email,
+                        emailVerified: user.email_verified || false,
                         phoneNumber: user.phone_number,
-                        blocked: user.blocked
+                        phoneNumberVerified: user.phone_verified || false,
+                        blocked: user.blocked || false
                     },
                     context: {
                         authenticationMethods: context.authentication.methods,
                         stats: context.stats,
                         geoIp: context.request.geoip,
-                        primaryUser: context.primaryUser
+                        primaryUser: context.primaryUser,
+                        ssoCurrentClients: context.sso.current_clients
                     }
                 }
             },
@@ -304,11 +318,11 @@ var Cognition = /** @class */ (function () {
             dateTime: new Date(),
             ipAddress: context.request.ip,
             login: {
-                userId: this.getUserId(user, context),
-                channel: this.getChannel(user, context),
+                userId: this._getUserId(user, context),
+                channel: this._getChannel(user, context),
                 usedCaptcha: false,
                 usedRememberMe: false,
-                authenticationType: this.getAuthenticationType(user, context),
+                authenticationType: this._getAuthenticationType(user, context),
                 status: "success" /* success */,
                 passwordUpdateTime: user.last_password_reset
             }

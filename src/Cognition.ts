@@ -115,6 +115,8 @@ interface User {
     email_verified: boolean,
     identities: Array<UserIdentity>
     multifactor: Array<string>,
+    family_name: string,
+    given_name: string,
     name: string,
     nickname: string,
     last_password_reset: Date,
@@ -403,6 +405,8 @@ class Cognition {
                     user: {
                         updated: user.updated_at,
                         fullName: user.name,
+                        lastName: user.family_name,
+                        firstName: user.given_name,
                         username: user.username,
                         email: user.email,
                         emailVerified: user.email_verified || false,
