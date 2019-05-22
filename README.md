@@ -38,9 +38,6 @@ manager or technical contact.
 * PRECOGNITIVE_USERNAME - UserName is used for Basic-Auth 
 * PRECOGNITIVE_PASSWORD - Password is used for Basic-Auth
 
-## Cognition Class
-aaa
-
 ## Client-Side Installation
 
 Auth0 provides a session ID that is accessible in the browser by utilizing the `auth0` cookie. You can retrieve and parse 
@@ -56,5 +53,3 @@ the cookie in whatever way is easiest for your team as long as the value is pass
   _trnu('set', 'eventId', {{ custom_event_id }});
 </script>
 ``` 
-
-Query string
