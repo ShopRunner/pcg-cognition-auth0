@@ -8,6 +8,7 @@ const body = {
     "decision": "allow",
     "score": _.random(-200, 200),
     "confidence": _.random(0, 100),
+    "tokenId": "1312421142",
     "signals": [
         "test",
         "test2"

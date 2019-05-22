@@ -1,6 +1,6 @@
 {
   "name": "cognition-auth0",
-  "version": "1.0.0-rc",
+  "version": "1.0.0-rc1",
   "description": "Cognition SDK for Auth0 Integration",
   "directories": {
     "test": "tests"
