@@ -16,7 +16,7 @@
     "gulp-typescript": "^5.0.0",
     "gulp-wrap": "^0.14.0",
     "jest": "^24.1.0",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.21",
     "nock": "^10.0.6",
     "request": "^2.88.0",
     "typescript": "^3.3.3"
